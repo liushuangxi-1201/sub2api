@@ -101,6 +101,7 @@ func TestGroupCachePlansScheduleAndAutoCollectionWhileHidden(t *testing.T) {
 	prefix := strings.Split(prompts[0], "\n[cache-round]")[0]
 	for _, prompt := range prompts {
 		require.Equal(t, prefix, strings.Split(prompt, "\n[cache-round]")[0])
+		require.True(t, strings.HasPrefix(prompt, "Synthetic cache reference "+repo.results[0].RunID+"\n"))
 	}
 	require.NotEqual(t, prompts[0], prompts[1])
 	raw, err := json.Marshal(published.items[0])
@@ -109,7 +110,7 @@ func TestGroupCachePlansScheduleAndAutoCollectionWhileHidden(t *testing.T) {
 	require.Equal(t, 20, published.keep)
 }
 func TestGroupCachePlansDoNotPublishMissingMeteringOrReplayWarmFailure(t *testing.T) {
-	for _, name := range []string{"warm failure", "missing cache usage", "missing output usage", "negative cache usage", "oversized input", "cache exceeds input", "fractional tokens"} {
+	for _, name := range []string{"warm failure", "missing cache usage", "missing output usage", "negative cache usage", "oversized input", "cache exceeds input", "cache write exceeds input", "negative cache write", "fractional tokens"} {
 		t.Run(name, func(t *testing.T) {
 			s, repo, published, router := cachePlanFixture()
 			calls := 0
@@ -127,6 +128,10 @@ func TestGroupCachePlansDoNotPublishMissingMeteringOrReplayWarmFailure(t *testin
 					u.read(`{"type":"response.completed","response":{"usage":{"input_tokens":1e30,"output_tokens":2,"input_tokens_details":{"cached_tokens":0}}}}`)
 				case "cache exceeds input":
 					u.read(`{"type":"response.completed","response":{"usage":{"input_tokens":1000,"output_tokens":2,"input_tokens_details":{"cached_tokens":1001}}}}`)
+				case "cache write exceeds input":
+					u.read(`{"type":"response.completed","response":{"usage":{"input_tokens":1000,"output_tokens":2,"input_tokens_details":{"cached_tokens":900,"cache_write_tokens":101}}}}`)
+				case "negative cache write":
+					u.read(`{"type":"response.completed","response":{"usage":{"input_tokens":1000,"output_tokens":2,"input_tokens_details":{"cached_tokens":0,"cache_write_tokens":-1}}}}`)
 				case "fractional tokens":
 					u.read(`{"type":"response.completed","response":{"usage":{"input_tokens":1000.5,"output_tokens":2,"input_tokens_details":{"cached_tokens":0}}}}`)
 				default:
@@ -212,7 +217,8 @@ func TestGroupCachePlansValidateAndPreserveGroupOwner(t *testing.T) {
 }
 
 func TestGroupCacheProbePayloadLeavesTheRoundSuffixUncached(t *testing.T) {
-	ctx := withPelicanTestOptions(context.Background(), pelicanTestOptions{cacheProbe: true, maxOutput: 256, prompt: "stable reference\n[cache-round]2\nReply with OK only."})
+	prefix := "stable reference\n[cache-round]example in the reference"
+	ctx := withPelicanTestOptions(context.Background(), pelicanTestOptions{cacheProbe: true, maxOutput: 256, prompt: prefix + "\n[cache-round]2\nReply with OK only."})
 	payload, err := createPelicanClaudePayload("claude-sonnet-4-5", "unused", "minimal")
 	require.NoError(t, err)
 	applyCacheProbePayload(ctx, payload, "messages", false)
@@ -221,7 +227,7 @@ func TestGroupCacheProbePayloadLeavesTheRoundSuffixUncached(t *testing.T) {
 	require.True(t, ok)
 	content, ok := messages[0]["content"].([]map[string]any)
 	require.True(t, ok)
-	require.Equal(t, "stable reference", content[0]["text"])
+	require.Equal(t, prefix, content[0]["text"])
 	require.Contains(t, content[0], "cache_control")
 	require.NotContains(t, content[1], "cache_control")
 	responses := map[string]any{}

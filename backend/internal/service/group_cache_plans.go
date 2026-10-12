@@ -350,7 +350,9 @@ func (s *GroupCacheTestService) sample(ctx context.Context, plan *GroupCacheTest
 		result.CostIncomplete = incomplete || (attempted && !priced)
 	}()
 	excluded := map[int64]struct{}{}
-	prefix := plan.Config.Prompt + "\n\n" + cacheSyntheticPrefix(result.RunID, plan.Config.PrefixBlocks)
+	// Salt before the administrator text so a long shared prompt cannot prime
+	// the synthetic prefix across samples. Provider system content may still hit.
+	prefix := cacheSyntheticPrefix(result.RunID, plan.Config.PrefixBlocks) + "\n" + plan.Config.Prompt + "\nReply with OK only."
 	for attempt := 0; attempt < PelicanGroupTestMaxAttempts; attempt++ {
 		if ctx.Err() != nil {
 			result.ErrorMessage = "cache_test_timeout"

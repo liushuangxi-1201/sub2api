@@ -19,7 +19,7 @@ export default {
   "saveError": "Could not save. Refresh to confirm the current state.",
   "publishError": "Publication was not confirmed. Refresh to check; rounds must belong to you and share a group, key, model and protocol, with no duplicate publication.",
   "userTitle": "Cache test results",
-  "userDescription": "Scheduled group cache experiments are collected automatically when successful. Compare repeat request latency and cache usage.",
+  "userDescription": "Warm cache diagnostics on a fixed account within each group. Successful samples are collected automatically to compare repeat latency and upstream-reported cache usage.",
   "firstToken": "First token",
   "cacheRate": "24H cache rate",
   "allGroups": "All groups",
@@ -31,7 +31,7 @@ export default {
   "testedAt": "Last tested: {time}",
   "upstream": "Scheduled probe",
   "billingSource": "Billing verified",
-  "method": "Only collected repeat rounds contribute; baselines are excluded. These are probe samples, not all production traffic. Cache rate is token weighted: cache reads / total input. First text latency is averaged over repeats. Scheduled samples use raw upstream usage and server time to first text; manual billing samples use accounting values which may reflect billing rules. Sources are shown separately. Missing data appears as —. Refreshes every minute."
+  "method": "Only repeats from successfully collected tests contribute; baselines and failed samples are excluded. Each scheduled sequence holds one account, so it does not represent normal group routing or all production traffic. Cache rate is token weighted: cache reads / total input. First text latency is averaged over repeats. Scheduled samples use raw upstream usage and server time to first text; they cannot independently prove physical caching or provider settlement. Manual billing samples use accounting values which may reflect billing rules. Sources are shown separately. Missing data appears as —. Refreshes every minute."
 },
   "title": "Group cache test",
   "description": "Repeat a long prefix through real group routing to compare cache reads, response latency, and actual charges.",

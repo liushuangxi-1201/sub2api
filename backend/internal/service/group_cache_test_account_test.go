@@ -4,6 +4,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -16,6 +17,56 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
 )
+
+func TestGroupCacheBackgroundPrimesMatchingMessageBoundary(t *testing.T) {
+	for _, mode := range []string{"responses", "responses OAuth", "chat"} {
+		t.Run(mode, func(t *testing.T) {
+			account := &Account{ID: 11, Platform: PlatformOpenAI, Type: AccountTypeAPIKey, Status: StatusActive,
+				Credentials: map[string]any{"api_key": "mock-key", "base_url": "http://cache.example/v1"},
+				Extra:       map[string]any{openai_compat.ExtraKeyResponsesSupported: mode != "chat"},
+			}
+			if mode == "responses OAuth" {
+				account.Type = AccountTypeOAuth
+				account.Credentials = map[string]any{"access_token": "mock-oauth-token"}
+			}
+			stream := "data: " + `{"type":"response.output_text.delta","delta":"OK"}` + "\n\ndata: " +
+				`{"type":"response.completed","response":{"usage":{"input_tokens":4000,"output_tokens":2,"input_tokens_details":{"cached_tokens":0,"cache_write_tokens":3900}}}}` + "\n\n"
+			if mode == "chat" {
+				stream = "data: " + `{"choices":[{"delta":{"content":"OK"},"finish_reason":"stop"}]}` + "\n\ndata: " +
+					`{"usage":{"prompt_tokens":4000,"completion_tokens":2,"prompt_tokens_details":{"cached_tokens":0}}}` + "\n\ndata: [DONE]\n\n"
+			}
+			responses := make([]*http.Response, 3)
+			for i := range responses {
+				responses[i] = &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"text/event-stream"}}, Body: io.NopCloser(strings.NewReader(stream))}
+			}
+			svc, upstream := adaptiveCNAccountTestService(account, responses...)
+			// An administrator's reference may itself contain the reserved marker.
+			prefix := "stable reference\n[cache-round]example in the reference\nReply with OK only."
+			for round := 1; round <= 3; round++ {
+				collector := &pelicanTestUsageCollector{}
+				ctx := context.WithValue(context.Background(), pelicanTestUsageKey{}, collector)
+				prompt := prefix + fmt.Sprintf("\n[cache-round]%d\nReply with OK only.", round)
+				result, _, err := svc.RunCacheBackground(ctx, account.ID, "gpt-6-astra", prompt, "minimal", 256)
+				require.NoError(t, err)
+				require.Equal(t, "success", result.Status, result.ErrorMessage)
+			}
+			require.Len(t, upstream.bodies, 3)
+			path, contentPath := "input", "content.0.text"
+			if mode == "chat" {
+				path, contentPath = "messages", "content"
+			}
+			baseline := gjson.GetBytes(upstream.bodies[0], path).Array()
+			require.Len(t, baseline, 1, "the first request must write a boundary ending at the stable message")
+			require.Equal(t, prefix, baseline[0].Get(contentPath).String())
+			for i, body := range upstream.bodies[1:] {
+				messages := gjson.GetBytes(body, path).Array()
+				require.Len(t, messages, 2)
+				require.Equal(t, baseline[0].Raw, messages[0].Raw, "a repeated request must retain the exact baseline message")
+				require.Equal(t, fmt.Sprintf("[cache-round]%d\nReply with OK only.", i+2), messages[1].Get(contentPath).String())
+			}
+		})
+	}
+}
 
 func TestGroupCacheBackgroundRejectsTruncatedOrRefusedStreams(t *testing.T) {
 	for _, tc := range []struct {

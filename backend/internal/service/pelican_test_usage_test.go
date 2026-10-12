@@ -44,6 +44,20 @@ func TestPelicanTestUsageStreams(t *testing.T) {
 			want: UsageTokens{InputTokens: 200, OutputTokens: 200, CacheReadTokens: 800},
 		},
 		{
+			name: "responses separates official cache write tokens from ordinary input", process: svc.processOpenAIStream,
+			events: []string{
+				`{"type":"response.completed","response":{"usage":{"input_tokens":4000,"output_tokens":2,"input_tokens_details":{"cached_tokens":0,"cache_write_tokens":3900}}}}`,
+			},
+			want: UsageTokens{InputTokens: 100, OutputTokens: 2, CacheCreationTokens: 3900},
+		},
+		{
+			name: "responses counts read and write tokens once", process: svc.processOpenAIStream,
+			events: []string{
+				`{"type":"response.completed","response":{"usage":{"input_tokens":4000,"output_tokens":2,"input_tokens_details":{"cached_tokens":3800,"cache_write_tokens":100}}}}`,
+			},
+			want: UsageTokens{InputTokens: 100, OutputTokens: 2, CacheReadTokens: 3800, CacheCreationTokens: 100},
+		},
+		{
 			name: "chat reads usage-only final chunk", process: svc.processOpenAIChatCompletionsStream,
 			events: []string{
 				`{"choices":[{"delta":{"content":"<svg/>"},"finish_reason":"stop"}]}`,

@@ -60,28 +60,49 @@ func (s *AccountTestService) RunCacheBackground(ctx context.Context, accountID i
 	return &ScheduledTestResult{Status: status, ResponseText: output, ErrorMessage: message, StartedAt: started, FinishedAt: time.Now(), LatencyMs: time.Since(started).Milliseconds()}, timing.first, nil
 }
 
-// Apply only to cache probes; existing Pelican and connection tests retain
-// their payloads. Claude caches the shared prefix, excluding the round suffix.
+// Apply only to cache probes. Prime OpenAI's shared message in the baseline,
+// then append a separate round message so newer models can look up that exact
+// earlier message ending. A changed suffix inside one message has no matching
+// implicit breakpoint. Claude marks the shared content block explicitly.
 func applyCacheProbePayload(ctx context.Context, payload map[string]any, protocol string, oauth bool) {
 	options, ok := pelicanTestOptionsFromContext(ctx)
 	if !ok || !options.cacheProbe {
 		return
 	}
+	boundary := strings.LastIndex(options.prompt, "\n[cache-round]")
+	prefix, suffix := "", ""
+	if boundary >= 0 {
+		prefix, suffix = options.prompt[:boundary], options.prompt[boundary+1:]
+	}
+	baseline := strings.HasPrefix(suffix, "[cache-round]1\n")
 	switch protocol {
 	case "messages":
 		payload["max_tokens"] = options.maxOutput
-		prefix, suffix, found := strings.Cut(options.prompt, "\n[cache-round]")
-		if found {
+		if boundary >= 0 {
 			payload["messages"] = []map[string]any{{"role": "user", "content": []map[string]any{
 				{"type": "text", "text": prefix, "cache_control": map[string]any{"type": "ephemeral"}},
-				{"type": "text", "text": "[cache-round]" + suffix},
+				{"type": "text", "text": suffix},
 			}}}
 		}
 	case "chat":
 		payload["max_completion_tokens"] = options.maxOutput
+		if boundary >= 0 {
+			messages := []map[string]any{{"role": "user", "content": prefix}}
+			if !baseline {
+				messages = append(messages, map[string]any{"role": "user", "content": suffix})
+			}
+			payload["messages"] = messages
+		}
 	case "responses":
 		if !oauth {
 			payload["max_output_tokens"] = options.maxOutput
+		}
+		if boundary >= 0 {
+			input := []map[string]any{{"role": "user", "content": []map[string]any{{"type": "input_text", "text": prefix}}}}
+			if !baseline {
+				input = append(input, map[string]any{"role": "user", "content": []map[string]any{{"type": "input_text", "text": suffix}}})
+			}
+			payload["input"] = input
 		}
 	}
 }

@@ -160,6 +160,7 @@ func (u *pelicanTestUsage) read(raw string) {
 		set("input_tokens_details.cached_tokens", &u.tokens.CacheReadTokens)
 		set("cache_read_input_tokens", &u.tokens.CacheReadTokens)
 		set("cache_creation_input_tokens", &u.tokens.CacheCreationTokens)
+		set("input_tokens_details.cache_write_tokens", &u.tokens.CacheCreationTokens)
 	}
 	u.tokens.InputTokens = u.input
 	if u.protocol != "anthropic" {
