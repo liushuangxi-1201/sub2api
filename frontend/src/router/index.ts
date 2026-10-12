@@ -533,6 +533,7 @@ const routes: RouteRecordRaw[] = [
       titleKey: 'nav.channelStatus'
     }
   },
+  { path: '/group-cache-showcase', name: 'GroupCacheShowcase', component: () => import('@/views/user/GroupCacheShowcaseView.vue'), meta: { requiresAuth: true, requiresAdmin: false, title: 'Group Cache Results', titleKey: 'admin.groupCacheTest.showcase.userTitle' } },
   {
     path: '/pelican-showcase',
     name: 'PelicanShowcase',

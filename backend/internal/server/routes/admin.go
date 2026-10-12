@@ -140,6 +140,7 @@ func RegisterAdminRoutes(
 
 		// 鹈鹕测智用户展示
 		registerPelicanShowcaseRoutes(admin, h)
+		registerGroupCacheShowcaseRoutes(admin, h)
 
 		// 渠道管理
 		registerChannelRoutes(admin, h)
@@ -1105,4 +1106,12 @@ func channelMonitorModeGuard(settingService *service.SettingService, allowed fun
 		}
 		c.Next()
 	}
+}
+
+func registerGroupCacheShowcaseRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	admin.GET("/group-cache-showcase/settings", h.GroupCacheShowcase.GetSettings)
+	admin.PUT("/group-cache-showcase/settings", h.GroupCacheShowcase.UpdateSettings)
+	admin.GET("/group-cache-showcase/items", h.GroupCacheShowcase.List)
+	admin.POST("/group-cache-showcase/items", h.GroupCacheShowcase.Publish)
+	admin.DELETE("/group-cache-showcase/items/:id", h.GroupCacheShowcase.Delete)
 }

@@ -54,30 +54,31 @@ type AdminHandlers struct {
 
 // Handlers contains all HTTP handlers
 type Handlers struct {
-	Auth             *AuthHandler
-	User             *UserHandler
-	APIKey           *APIKeyHandler
-	Usage            *UsageHandler
-	Redeem           *RedeemHandler
-	Subscription     *SubscriptionHandler
-	Announcement     *AnnouncementHandler
-	ChannelMonitor   *ChannelMonitorUserHandler
-	ChannelMonitorV2 *ChannelMonitorV2Handler
-	ChannelMonitorV3 *ChannelMonitorV3Handler
-	Admin            *AdminHandlers
-	Gateway          *GatewayHandler
-	OpenAIGateway    *OpenAIGatewayHandler
-	Setting          *SettingHandler
-	Totp             *TotpHandler
-	Passkey          *PasskeyHandler
-	Payment          *PaymentHandler
-	PaymentWebhook   *PaymentWebhookHandler
-	AvailableChannel *AvailableChannelHandler
-	PelicanShowcase  *PelicanShowcaseHandler
-	SupportTicket    *SupportTicketHandler
-	ModelPlaza       *ModelPlazaHandler
-	AsyncImage       *AsyncImageHandler
-	BatchImage       *BatchImageHandler
+	Auth               *AuthHandler
+	User               *UserHandler
+	APIKey             *APIKeyHandler
+	Usage              *UsageHandler
+	Redeem             *RedeemHandler
+	Subscription       *SubscriptionHandler
+	Announcement       *AnnouncementHandler
+	ChannelMonitor     *ChannelMonitorUserHandler
+	ChannelMonitorV2   *ChannelMonitorV2Handler
+	ChannelMonitorV3   *ChannelMonitorV3Handler
+	Admin              *AdminHandlers
+	Gateway            *GatewayHandler
+	OpenAIGateway      *OpenAIGatewayHandler
+	Setting            *SettingHandler
+	Totp               *TotpHandler
+	Passkey            *PasskeyHandler
+	Payment            *PaymentHandler
+	PaymentWebhook     *PaymentWebhookHandler
+	AvailableChannel   *AvailableChannelHandler
+	PelicanShowcase    *PelicanShowcaseHandler
+	GroupCacheShowcase *GroupCacheShowcaseHandler
+	SupportTicket      *SupportTicketHandler
+	ModelPlaza         *ModelPlazaHandler
+	AsyncImage         *AsyncImageHandler
+	BatchImage         *BatchImageHandler
 }
 
 // BuildInfo contains build-time information

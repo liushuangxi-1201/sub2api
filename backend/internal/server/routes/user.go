@@ -158,6 +158,9 @@ func RegisterUserRoutes(
 			monitors.GET("/:id/status", h.ChannelMonitor.GetStatus)
 		}
 
+		// 分组缓存测试展示（用户只读；功能关闭时不返回结果）
+		authenticated.GET("/group-cache-showcase", panelRateLimiter.Heavy(), h.GroupCacheShowcase.View)
+
 		// 鹈鹕测智展示（用户只读；功能关闭时返回空画廊）
 		showcase := authenticated.Group("/pelican-showcase")
 		{

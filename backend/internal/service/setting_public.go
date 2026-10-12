@@ -238,6 +238,7 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		SettingKeyChannelMonitorHideUserRanking,
 		SettingKeyAvailableChannelsEnabled,
 		SettingKeyPelicanShowcaseEnabled,
+		SettingKeyGroupCacheShowcaseEnabled,
 		SettingKeySubscriptionEnabled,
 		SettingKeyModelPlazaEnabled,
 		SettingKeyModelPlazaRequireAuth,
@@ -371,8 +372,9 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		ChannelMonitorShowQuota:              settings[SettingKeyChannelMonitorShowQuota] == "true",
 		ChannelMonitorHideUserRanking:        isTrueSettingValue(settings[SettingKeyChannelMonitorHideUserRanking]),
 
-		AvailableChannelsEnabled: settings[SettingKeyAvailableChannelsEnabled] == "true",
-		PelicanShowcaseEnabled:   settings[SettingKeyPelicanShowcaseEnabled] == "true",
+		AvailableChannelsEnabled:  settings[SettingKeyAvailableChannelsEnabled] == "true",
+		PelicanShowcaseEnabled:    settings[SettingKeyPelicanShowcaseEnabled] == "true",
+		GroupCacheShowcaseEnabled: settings[SettingKeyGroupCacheShowcaseEnabled] == "true",
 
 		SubscriptionEnabled: !isFalseSettingValue(settings[SettingKeySubscriptionEnabled]),
 
@@ -682,6 +684,7 @@ type PublicSettingsInjectionPayload struct {
 	ChannelMonitorShowQuota       bool `json:"channel_monitor_show_quota"`
 	AvailableChannelsEnabled      bool `json:"available_channels_enabled"`
 	PelicanShowcaseEnabled        bool `json:"pelican_showcase_enabled"`
+	GroupCacheShowcaseEnabled     bool `json:"group_cache_showcase_enabled"`
 	SubscriptionEnabled           bool `json:"subscription_enabled"`
 	ModelPlazaEnabled             bool `json:"model_plaza_enabled"`
 	ModelPlazaRequireAuth         bool `json:"model_plaza_require_auth"`
@@ -771,6 +774,7 @@ func (s *SettingService) GetPublicSettingsForInjection(ctx context.Context) (any
 		ChannelMonitorHideUserRanking:        settings.ChannelMonitorHideUserRanking,
 		AvailableChannelsEnabled:             settings.AvailableChannelsEnabled,
 		PelicanShowcaseEnabled:               settings.PelicanShowcaseEnabled,
+		GroupCacheShowcaseEnabled:            settings.GroupCacheShowcaseEnabled,
 		SubscriptionEnabled:                  settings.SubscriptionEnabled,
 		ModelPlazaEnabled:                    settings.ModelPlazaEnabled,
 		ModelPlazaRequireAuth:                settings.ModelPlazaRequireAuth,

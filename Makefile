@@ -2,6 +2,9 @@
 
 FRONTEND_CRITICAL_VITEST := \
 	src/api/__tests__/groupCacheTest.spec.ts \
+	src/api/__tests__/groupCacheShowcase.spec.ts \
+	src/components/admin/operations/__tests__/GroupCachePublicationPanel.spec.ts \
+	src/views/user/__tests__/GroupCacheShowcaseView.spec.ts \
 	src/views/admin/__tests__/GroupCacheTestView.spec.ts \
 	src/components/account/__tests__/OpenAIRequestTimezoneField.spec.ts \
 	src/components/admin/__tests__/HarvestGatewayBorrowPanel.spec.ts \

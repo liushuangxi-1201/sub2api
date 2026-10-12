@@ -1053,6 +1053,7 @@ var ProviderSet = wire.NewSet(
 	ProvideSystemOperationLockService,
 	ProvideIdempotencyCleanupService,
 	NewPelicanShowcaseService,
+	NewGroupCacheShowcaseService,
 	NewPelicanGroupTestService,
 	NewControlledExperimentGateway,
 	NewControlledExperimentService,
