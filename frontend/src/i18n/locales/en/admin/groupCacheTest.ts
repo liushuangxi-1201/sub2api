@@ -19,7 +19,7 @@ export default {
   "saveError": "Could not save. Refresh to confirm the current state.",
   "publishError": "Publication was not confirmed. Refresh to check; rounds must belong to you and share a group, key, model and protocol, with no duplicate publication.",
   "userTitle": "Cache test results",
-  "userDescription": "Compare response latency and cache hits for repeated long-prefix requests in tests selected by administrators.",
+  "userDescription": "Scheduled group cache experiments are collected automatically when successful. Compare repeat request latency and cache usage.",
   "firstToken": "First token",
   "cacheRate": "24H cache rate",
   "allGroups": "All groups",
@@ -29,7 +29,9 @@ export default {
   "sampleCount": "{count} repeat requests in 24 hours · {latency} latency samples",
   "noRecentSamples": "No repeat request samples in the last 24 hours",
   "testedAt": "Last tested: {time}",
-  "method": "Only repeated rounds in administrator-published tests are included; initial rounds and general production traffic are excluded. Cache rate is cache-read tokens divided by total input tokens, weighted by tokens. Latency is the average server first-token time from billing records. Billing rules may affect these measurements; they do not prove physical upstream caching. Up to 100 published tests are kept per group and summarized by model and protocol. No samples displays “—”. Refreshes every minute."
+  "upstream": "Scheduled probe",
+  "billingSource": "Billing verified",
+  "method": "Only collected repeat rounds contribute; baselines are excluded. These are probe samples, not all production traffic. Cache rate is token weighted: cache reads / total input. First text latency is averaged over repeats. Scheduled samples use raw upstream usage and server time to first text; manual billing samples use accounting values which may reflect billing rules. Sources are shown separately. Missing data appears as —. Refreshes every minute."
 },
   "title": "Group cache test",
   "description": "Repeat a long prefix through real group routing to compare cache reads, response latency, and actual charges.",

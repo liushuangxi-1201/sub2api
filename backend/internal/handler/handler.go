@@ -75,6 +75,7 @@ type Handlers struct {
 	AvailableChannel   *AvailableChannelHandler
 	PelicanShowcase    *PelicanShowcaseHandler
 	GroupCacheShowcase *GroupCacheShowcaseHandler
+	GroupCacheTests    *GroupCacheTestHandler
 	SupportTicket      *SupportTicketHandler
 	ModelPlaza         *ModelPlazaHandler
 	AsyncImage         *AsyncImageHandler

@@ -1,6 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import GroupCacheTestView from '../GroupCacheTestView.vue'
+import GroupCacheTestView from '../GroupCacheProbeView.vue'
 import { DEFAULT_CACHE_SETTINGS, loadCacheHistory, saveCacheHistory, type CacheTestRun } from '@/utils/groupCacheTest'
 
 const mocks = vi.hoisted(() => ({

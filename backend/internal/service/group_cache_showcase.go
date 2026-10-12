@@ -23,7 +23,7 @@ type GroupCachePublishRequest struct {
 	Rounds   []GroupCachePublishRound `json:"rounds"`
 }
 
-// Only server billing measurements enter a snapshot. Never store prompts, keys,
+// Only verified server measurements enter a snapshot. Never store prompts, keys,
 // account identities, costs or browser-reported cache rates in this feature.
 type GroupCacheSnapshotRound struct {
 	UsageLogID      int64
@@ -35,6 +35,8 @@ type GroupCacheSnapshotRound struct {
 }
 type GroupCacheSnapshot struct {
 	ID          int64                     `json:"id"`
+	PlanID      int64                     `json:"-"`
+	Source      string                    `json:"source"`
 	RunID       string                    `json:"run_id"`
 	CreatedBy   int64                     `json:"created_by"`
 	GroupID     int64                     `json:"group_id"`
@@ -48,6 +50,7 @@ type GroupCacheSnapshot struct {
 
 // Separate public DTO: internal snapshot/user/request IDs never reach users.
 type GroupCacheShowcaseItem struct {
+	Source          string    `json:"source"`
 	GroupID         int64     `json:"group_id"`
 	GroupName       string    `json:"group_name"`
 	Platform        string    `json:"platform"`
@@ -72,7 +75,8 @@ type GroupCacheShowcaseRepository interface {
 	Publish(context.Context, *GroupCacheSnapshot) error
 	List(context.Context, int64) ([]*GroupCacheSnapshot, error)
 	Delete(context.Context, int64) (bool, error)
-	Summary(context.Context, time.Time, time.Time) ([]*GroupCacheShowcaseItem, error)
+	Summary(context.Context, time.Time, time.Time, int, time.Time) ([]*GroupCacheShowcaseItem, error)
+	Prune(context.Context, int, time.Time) error
 }
 type GroupCacheShowcaseService struct {
 	repo     GroupCacheShowcaseRepository
@@ -108,15 +112,15 @@ func (s *GroupCacheShowcaseService) SetEnabled(ctx context.Context, enabled bool
 	return nil
 }
 func (s *GroupCacheShowcaseService) View(ctx context.Context, now time.Time) (*GroupCacheShowcaseView, error) {
-	enabled, err := s.Enabled(ctx)
+	settings, err := s.Settings(ctx)
 	if err != nil {
 		return nil, err
 	}
-	view := &GroupCacheShowcaseView{Enabled: enabled, WindowStart: now.Add(-24 * time.Hour), WindowEnd: now, Items: []*GroupCacheShowcaseItem{}}
-	if !enabled {
+	view := &GroupCacheShowcaseView{Enabled: settings.Enabled, WindowStart: now.Add(-24 * time.Hour), WindowEnd: now, Items: []*GroupCacheShowcaseItem{}}
+	if !settings.Enabled {
 		return view, nil
 	}
-	view.Items, err = s.repo.Summary(ctx, view.WindowStart, now)
+	view.Items, err = s.repo.Summary(ctx, view.WindowStart, now, settings.MaxItems, settings.retentionCutoff(now))
 	return view, err
 }
 func (s *GroupCacheShowcaseService) List(ctx context.Context, groupID int64) ([]*GroupCacheSnapshot, error) {
@@ -158,7 +162,7 @@ func (s *GroupCacheShowcaseService) Publish(ctx context.Context, userID int64, r
 	if group == nil || group.Status != StatusActive {
 		return nil, cacheShowcaseInvalid()
 	}
-	snapshot := &GroupCacheSnapshot{RunID: req.RunID, CreatedBy: userID, GroupID: req.GroupID, GroupName: group.Name, Model: req.Model, Protocol: req.Protocol}
+	snapshot := &GroupCacheSnapshot{RunID: req.RunID, CreatedBy: userID, GroupID: req.GroupID, GroupName: group.Name, Model: req.Model, Protocol: req.Protocol, Source: "billing"}
 	seen := map[int64]bool{}
 	seenRequests := map[string]bool{}
 	var first, previous time.Time

@@ -14,15 +14,38 @@ type cacheShowcaseRepoStub struct {
 	GroupCacheShowcaseRepository
 	saved        *GroupCacheSnapshot
 	summaryCalls int
+	keep         int
+	cutoff       time.Time
 }
 
 func (r *cacheShowcaseRepoStub) Publish(_ context.Context, item *GroupCacheSnapshot) error {
 	r.saved = item
 	return nil
 }
-func (r *cacheShowcaseRepoStub) Summary(_ context.Context, _, _ time.Time) ([]*GroupCacheShowcaseItem, error) {
+func (r *cacheShowcaseRepoStub) Summary(_ context.Context, _, _ time.Time, keep int, cutoff time.Time) ([]*GroupCacheShowcaseItem, error) {
 	r.summaryCalls++
+	r.keep, r.cutoff = keep, cutoff
 	return []*GroupCacheShowcaseItem{{GroupID: 7, GroupName: "Public group"}}, nil
+}
+
+func TestGroupCacheShowcaseReadAppliesSavedLimits(t *testing.T) {
+	svc, repo, _, _, now := cacheShowcaseFixture()
+	ctx := context.Background()
+	settings, err := svc.Settings(ctx)
+	require.NoError(t, err)
+	settings.Enabled, settings.MaxItems, settings.RetentionDays = true, 2, 1
+	_, err = svc.UpdateSettings(ctx, settings)
+	require.NoError(t, err)
+	_, err = svc.View(ctx, now)
+	require.NoError(t, err)
+	require.Equal(t, 2, repo.keep)
+	require.Equal(t, now.Add(-24*time.Hour), repo.cutoff)
+	settings.AutoCleanup = false
+	_, err = svc.UpdateSettings(ctx, settings)
+	require.NoError(t, err)
+	_, err = svc.View(ctx, now)
+	require.NoError(t, err)
+	require.True(t, repo.cutoff.IsZero())
 }
 
 type cacheShowcaseUsageStub struct {
@@ -130,7 +153,9 @@ func TestGroupCacheShowcaseRejectsUnverifiablePublications(t *testing.T) {
 			r.Rounds[0], r.Rounds[1] = r.Rounds[1], r.Rounds[0]
 		},
 		"inactive group": func(s *GroupCacheShowcaseService, _ *cacheShowcaseUsageStub, _ *GroupCachePublishRequest) {
-			s.groups.(*cacheShowcaseGroupStub).group.Status = StatusDisabled
+			groups, ok := s.groups.(*cacheShowcaseGroupStub)
+			require.True(t, ok)
+			groups.group.Status = StatusDisabled
 		},
 	}
 	for name, change := range cases {
@@ -168,7 +193,9 @@ func TestGroupCacheShowcaseSwitchFailsClosedAndHidesRecords(t *testing.T) {
 	view, err = svc.View(ctx, now)
 	require.NoError(t, err)
 	require.Empty(t, view.Items)
-	svc.settings.(*showcaseRuntimeSettingRepo).readErr = errors.New("offline")
+	settings, ok := svc.settings.(*showcaseRuntimeSettingRepo)
+	require.True(t, ok)
+	settings.readErr = errors.New("offline")
 	view, err = svc.View(ctx, now)
 	require.Error(t, err)
 	require.Nil(t, view)

@@ -15,8 +15,8 @@
         </div>
         <section v-if="!visibleItems.length" class="showcase-empty" data-testid="showcase-empty">{{ t('admin.groupCacheTest.showcase.empty') }}</section>
         <div v-else class="grid items-start gap-5 lg:grid-cols-2 2xl:grid-cols-3">
-          <article v-for="item in visibleItems" :key="`${item.group_id}:${item.model}:${item.protocol}`" class="min-w-0 rounded-2xl border border-gray-200 bg-white p-5 dark:border-dark-700 dark:bg-dark-800" data-testid="cache-showcase-card">
-            <header><h2 class="break-words text-lg font-semibold">{{ item.group_name }}</h2><p class="mt-1 break-all text-sm text-gray-500">{{ item.model }} · {{ protocolName(item.protocol) }}</p></header>
+          <article v-for="item in visibleItems" :key="`${item.group_id}:${item.model}:${item.protocol}:${item.source}`" class="min-w-0 rounded-2xl border border-gray-200 bg-white p-5 dark:border-dark-700 dark:bg-dark-800" data-testid="cache-showcase-card">
+            <header><h2 class="break-words text-lg font-semibold">{{ item.group_name }}</h2><p class="mt-1 break-all text-sm text-gray-500">{{ item.model }} · {{ protocolName(item.protocol) }} · {{ t(item.source === 'upstream' ? 'admin.groupCacheTest.showcase.upstream' : 'admin.groupCacheTest.showcase.billingSource') }}</p></header>
             <dl class="my-5 grid grid-cols-2 gap-4">
               <div class="showcase-metric"><dt><Icon name="bolt" size="md" aria-hidden="true" /><span>{{ t('admin.groupCacheTest.showcase.firstToken') }}</span></dt><dd data-testid="showcase-latency">{{ item.first_token_ms == null ? '—' : (item.first_token_ms / 1000).toFixed(1) }}<small v-if="item.first_token_ms != null">s</small></dd></div>
               <div class="showcase-metric"><dt><Icon name="globe" size="md" aria-hidden="true" /><span>{{ t('admin.groupCacheTest.showcase.cacheRate') }}</span></dt><dd data-testid="showcase-rate">{{ item.cache_hit_rate == null ? '—' : (item.cache_hit_rate * 100).toFixed(1) }}<small v-if="item.cache_hit_rate != null">%</small></dd></div>

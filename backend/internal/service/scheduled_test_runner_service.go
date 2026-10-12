@@ -23,6 +23,7 @@ type ScheduledTestRunnerService struct {
 	runPelican     func(context.Context, int64, string, *PelicanTestConfig) (*ScheduledTestResult, error)
 	// groupTests runs the Pelican group tests on the same tick; nil disables them.
 	groupTests   *PelicanGroupTestService
+	cacheTests   *GroupCacheTestService
 	candyMonitor *ChannelMonitorV2CandyService
 
 	qualityTrigger *quality5xxTrigger
@@ -115,9 +116,11 @@ func (s *ScheduledTestRunnerService) runScheduled() {
 		logger.LegacyPrintf("service.scheduled_test_runner", "pelican history cleanup failed: %v", err)
 	}
 	s.groupTests.Cleanup(ctx, now)
+	s.cacheTests.Cleanup(ctx, now)
 	// Group tests run beside the account plans rather than after them.
 	var groupRuns sync.WaitGroup
-	groupRuns.Add(2)
+	groupRuns.Add(3)
+	go func() { defer groupRuns.Done(); s.cacheTests.RunDue(ctx, now) }()
 	go func() { defer groupRuns.Done(); s.candyMonitor.RunDue(ctx, now) }()
 	go func() {
 		defer groupRuns.Done()

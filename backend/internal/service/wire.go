@@ -733,6 +733,7 @@ func ProvideScheduledTestRunnerService(
 	judge *QualityJudgeService,
 	rdb *redis.Client,
 	groupTests *PelicanGroupTestService,
+	cacheTests *GroupCacheTestService,
 	monitor *ChannelMonitorV2Service,
 ) *ScheduledTestRunnerService {
 	svc := NewScheduledTestRunnerService(planRepo, scheduledSvc, accountTestSvc, rateLimitSvc, cfg)
@@ -741,6 +742,7 @@ func ProvideScheduledTestRunnerService(
 	}
 	svc.judgeQuality = judge.Judge
 	svc.groupTests = groupTests
+	svc.cacheTests = cacheTests
 	svc.candyMonitor = monitor.candy
 	startBackgroundService(cfg, svc)
 	return svc
@@ -1053,6 +1055,7 @@ var ProviderSet = wire.NewSet(
 	ProvideSystemOperationLockService,
 	ProvideIdempotencyCleanupService,
 	NewPelicanShowcaseService,
+	NewGroupCacheTestService,
 	NewGroupCacheShowcaseService,
 	NewPelicanGroupTestService,
 	NewControlledExperimentGateway,

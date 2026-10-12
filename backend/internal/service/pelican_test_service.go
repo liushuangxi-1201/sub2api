@@ -22,6 +22,8 @@ type pelicanTestOptions struct {
 	reasoningEffort string
 	testChannel     string
 	observeOnly     bool
+	cacheProbe      bool
+	maxOutput       int
 }
 
 func withPelicanTestOptions(ctx context.Context, options pelicanTestOptions) context.Context {

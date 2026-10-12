@@ -30,29 +30,73 @@ func (h *GroupCacheShowcaseHandler) View(c *gin.Context) {
 	response.Success(c, view)
 }
 func (h *GroupCacheShowcaseHandler) GetSettings(c *gin.Context) {
-	enabled, err := h.showcase.Enabled(c.Request.Context())
+	settings, err := h.showcase.Settings(c.Request.Context())
 	if err != nil {
 		response.InternalError(c, "Failed to load cache showcase settings")
 		return
 	}
-	response.Success(c, gin.H{"enabled": enabled})
+	response.Success(c, settings)
 }
 func (h *GroupCacheShowcaseHandler) UpdateSettings(c *gin.Context) {
 	var req struct {
-		Enabled *bool `json:"enabled"`
+		Enabled       *bool `json:"enabled"`
+		APIEnabled    *bool `json:"api_enabled"`
+		MaxItems      *int  `json:"max_items"`
+		AutoCleanup   *bool `json:"auto_cleanup"`
+		RetentionDays *int  `json:"retention_days"`
 	}
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 1024)
 	if c.ShouldBindJSON(&req) != nil || req.Enabled == nil {
 		response.BadRequest(c, "enabled is required")
 		return
 	}
-	if err := h.showcase.SetEnabled(c.Request.Context(), *req.Enabled); err != nil {
+	settings, err := h.showcase.Settings(c.Request.Context())
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	settings.Enabled = *req.Enabled
+	if req.APIEnabled != nil {
+		settings.APIEnabled = *req.APIEnabled
+	}
+	if req.MaxItems != nil {
+		if *req.MaxItems < 1 || *req.MaxItems > 100 {
+			response.BadRequest(c, "max_items must be 1–100")
+			return
+		}
+		settings.MaxItems = *req.MaxItems
+	}
+	if req.AutoCleanup != nil {
+		settings.AutoCleanup = *req.AutoCleanup
+	}
+	if req.RetentionDays != nil {
+		if *req.RetentionDays < 1 || *req.RetentionDays > 90 {
+			response.BadRequest(c, "retention_days must be 1–90")
+			return
+		}
+		settings.RetentionDays = *req.RetentionDays
+	}
+	saved, err := h.showcase.UpdateSettings(c.Request.Context(), settings)
+	if err != nil {
 		response.ErrorFrom(c, err)
 		return
 	}
 	subject, _ := middleware.GetAuthSubjectFromContext(c)
-	slog.Info("cache showcase visibility updated", "audit", true, "user_id", subject.UserID, "enabled", *req.Enabled)
-	response.Success(c, gin.H{"enabled": *req.Enabled})
+	slog.Info("cache showcase settings updated", "audit", true, "user_id", subject.UserID, "enabled", settings.Enabled, "api_enabled", settings.APIEnabled)
+	response.Success(c, saved)
+}
+func (h *GroupCacheShowcaseHandler) PublicView(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	settings, err := h.showcase.Settings(c.Request.Context())
+	if err != nil {
+		response.InternalError(c, "Failed to load cache showcase settings")
+		return
+	}
+	if !settings.Enabled || !settings.APIEnabled {
+		response.Forbidden(c, "Cache showcase API is disabled")
+		return
+	}
+	h.View(c)
 }
 func (h *GroupCacheShowcaseHandler) List(c *gin.Context) {
 	groupID, err := strconv.ParseInt(c.Query("group_id"), 10, 64)

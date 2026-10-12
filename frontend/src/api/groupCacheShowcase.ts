@@ -13,6 +13,7 @@ export interface CachePublication {
   published_at: string
 }
 export interface CacheShowcaseItem {
+  source?: 'billing' | 'upstream'
   group_id: number
   group_name: string
   platform: string

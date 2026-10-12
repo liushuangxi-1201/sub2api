@@ -68,7 +68,7 @@ func CORS(cfg config.CORSConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Published Pelican results use explicit API key headers, never cookies. Handle
 		// its preflight here because this global middleware precedes routes.
-		if isPublicPelicanShowcasePath(c.Request.URL.Path) {
+		if isPublicPelicanShowcasePath(c.Request.URL.Path) || isPublicGroupCacheShowcasePath(c.Request.URL.Path) {
 			method := c.Request.Method
 			if method == http.MethodOptions {
 				method = c.GetHeader("Access-Control-Request-Method")
@@ -148,4 +148,8 @@ func normalizeOrigins(values []string) []string {
 		normalized = append(normalized, trimmed)
 	}
 	return normalized
+}
+
+func isPublicGroupCacheShowcasePath(path string) bool {
+	return path == "/api/v1/public/group-cache-showcase"
 }

@@ -643,6 +643,7 @@ func (s *AccountTestService) testClaudeAccountConnection(c *gin.Context, account
 	payload, err := createTestPayload(testModelID)
 	if options, ok := pelicanTestOptionsFromContext(ctx); ok {
 		payload, err = createPelicanClaudePayload(testModelID, options.prompt, options.reasoningEffort)
+		applyCacheProbePayload(ctx, payload, "messages", false)
 	}
 	if err != nil {
 		return s.sendErrorAndEnd(c, "Failed to create test payload")
@@ -724,6 +725,7 @@ func (s *AccountTestService) testClaudeVertexServiceAccountConnection(c *gin.Con
 	payload, err := createTestPayload(testModelID)
 	if options, ok := pelicanTestOptionsFromContext(ctx); ok {
 		payload, err = createPelicanClaudePayload(testModelID, options.prompt, options.reasoningEffort)
+		applyCacheProbePayload(ctx, payload, "messages", false)
 	}
 	if err != nil {
 		return s.sendErrorAndEnd(c, "Failed to create test payload")
@@ -1007,6 +1009,7 @@ func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account
 	payload := createOpenAITestPayload(upstreamTestModelID, isOAuth)
 	if options, ok := pelicanTestOptionsFromContext(ctx); ok {
 		payload = createPelicanOpenAIPayload(upstreamTestModelID, isOAuth, options.prompt, options.reasoningEffort)
+		applyCacheProbePayload(ctx, payload, "responses", isOAuth)
 	}
 	payloadBytes, _ := json.Marshal(payload)
 
@@ -2376,6 +2379,7 @@ func (s *AccountTestService) testOpenAIChatCompletionsConnection(
 	c.Writer.Flush()
 
 	payload := createOpenAIChatCompletionsTestPayload(testModelID, prompt)
+	applyCacheProbePayload(ctx, payload, "chat", false)
 	if pelicanUsageFromContext(ctx) != nil {
 		payload["stream_options"] = map[string]any{"include_usage": true}
 	}
@@ -3608,6 +3612,12 @@ func (s *AccountTestService) testExcelBPSImages(c *gin.Context, ctx context.Cont
 }
 
 func (s *AccountTestService) sendEvent(c *gin.Context, event TestEvent) {
+	if c.Request != nil && event.Type == "content" && strings.TrimSpace(event.Text) != "" {
+		if timing, ok := c.Request.Context().Value(cacheTestTimingKey{}).(*cacheTestTiming); ok && timing.first == nil {
+			ms := int(time.Since(timing.started).Milliseconds())
+			timing.first = &ms
+		}
+	}
 	if event.Type == "test_start" && event.Model != "" && c.Request != nil {
 		if usage := pelicanUsageFromContext(c.Request.Context()); usage != nil {
 			usage.model = event.Model

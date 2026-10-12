@@ -1109,6 +1109,14 @@ func channelMonitorModeGuard(settingService *service.SettingService, allowed fun
 }
 
 func registerGroupCacheShowcaseRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	admin.GET("/group-cache-tests", h.GroupCacheTests.ListPlans)
+	admin.POST("/group-cache-tests", h.GroupCacheTests.SavePlan)
+	admin.PUT("/group-cache-tests/:id", h.GroupCacheTests.SavePlan)
+	admin.DELETE("/group-cache-tests/:id", h.GroupCacheTests.DeletePlan)
+	admin.POST("/group-cache-tests/:id/run", h.GroupCacheTests.RunPlan)
+	admin.GET("/group-cache-test-results", h.GroupCacheTests.ListResults)
+	admin.GET("/group-cache-test-results/:id", h.GroupCacheTests.GetResult)
+
 	admin.GET("/group-cache-showcase/settings", h.GroupCacheShowcase.GetSettings)
 	admin.PUT("/group-cache-showcase/settings", h.GroupCacheShowcase.UpdateSettings)
 	admin.GET("/group-cache-showcase/items", h.GroupCacheShowcase.List)

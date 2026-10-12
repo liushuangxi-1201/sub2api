@@ -38,7 +38,7 @@ func TestGroupCacheShowcaseRepo_WindowVisibilityAndWithdrawal(t *testing.T) {
 	items, err := repo.List(ctx, group.ID)
 	require.NoError(t, err)
 	require.Len(t, items, 1)
-	summary, err := repo.Summary(ctx, now.Add(-24*time.Hour), now)
+	summary, err := repo.Summary(ctx, now.Add(-24*time.Hour), now, 100, time.Time{})
 	require.NoError(t, err)
 	var metric *service.GroupCacheShowcaseItem
 	for _, item := range summary {
@@ -63,7 +63,7 @@ func TestGroupCacheShowcaseRepo_WindowVisibilityAndWithdrawal(t *testing.T) {
 
 	_, err = integrationDB.ExecContext(ctx, `UPDATE groups SET status=$1 WHERE id=$2`, service.StatusDisabled, group.ID)
 	require.NoError(t, err)
-	summary, err = repo.Summary(ctx, now.Add(-24*time.Hour), now)
+	summary, err = repo.Summary(ctx, now.Add(-24*time.Hour), now, 100, time.Time{})
 	require.NoError(t, err)
 	for _, item := range summary {
 		require.NotEqual(t, group.ID, item.GroupID, "disabled groups hidden")
@@ -71,7 +71,7 @@ func TestGroupCacheShowcaseRepo_WindowVisibilityAndWithdrawal(t *testing.T) {
 	_, err = integrationDB.ExecContext(ctx, `UPDATE groups SET status=$1 WHERE id=$2`, service.StatusActive, group.ID)
 	require.NoError(t, err)
 
-	summary, err = repo.Summary(ctx, now.Add(time.Minute), now.Add(24*time.Hour))
+	summary, err = repo.Summary(ctx, now.Add(time.Minute), now.Add(24*time.Hour), 100, time.Time{})
 	require.NoError(t, err)
 	for _, item := range summary {
 		if item.GroupID == group.ID {
@@ -115,4 +115,54 @@ func TestGroupCacheShowcaseRepo_RetentionAndRepublish(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, deleted)
 	require.NoError(t, repo.Publish(ctx, &service.GroupCacheSnapshot{RunID: "101", CreatedBy: user.ID, GroupID: group.ID, Model: "demo", Protocol: "messages", TestedAt: now, Rounds: []service.GroupCacheSnapshotRound{{Index: 1, UsageLogID: 10101, InputTokens: 1000, MeasuredAt: now}}}))
+}
+
+func TestGroupCacheShowcaseRepo_ReadLimitsAndSourcesBeforeCleanup(t *testing.T) {
+	ctx := context.Background()
+	client := testEntClient(t)
+	user := mustCreateUser(t, client, &service.User{Email: fmt.Sprintf("cache-read-limit-%d@example.com", time.Now().UnixNano()), PasswordHash: "hash", Role: service.RoleAdmin, Status: service.StatusActive})
+	group := mustCreateGroup(t, client, &service.Group{Name: "Cache read limit fixture"})
+	t.Cleanup(func() {
+		_, _ = integrationDB.ExecContext(context.Background(), `DELETE FROM groups WHERE id=$1`, group.ID)
+		_, _ = integrationDB.ExecContext(context.Background(), `DELETE FROM users WHERE id=$1`, user.ID)
+	})
+	repo := NewGroupCacheShowcaseRepository(integrationDB)
+	now := time.Now().UTC()
+	for i := 0; i < 4; i++ {
+		when := now.Add(time.Duration(i-4) * time.Minute)
+		if i == 0 {
+			when = now.Add(-48 * time.Hour)
+		}
+		source, read := "upstream", int64(900)
+		if i == 3 {
+			source, read = "billing", 500
+		}
+		snapshot := &service.GroupCacheSnapshot{RunID: fmt.Sprintf("limit-%d", i), CreatedBy: user.ID, GroupID: group.ID, Model: "demo", Protocol: "responses", Source: source, TestedAt: when,
+			Rounds: []service.GroupCacheSnapshotRound{{Index: 1, InputTokens: 1000, MeasuredAt: when}, {Index: 2, InputTokens: 1000, CacheReadTokens: read, MeasuredAt: when}},
+		}
+		require.NoError(t, repo.Publish(ctx, snapshot))
+	}
+	metrics := func(keep int, cutoff time.Time) map[string]*service.GroupCacheShowcaseItem {
+		summary, err := repo.Summary(ctx, now.Add(-24*time.Hour), now, keep, cutoff)
+		require.NoError(t, err)
+		items := map[string]*service.GroupCacheShowcaseItem{}
+		for _, item := range summary {
+			if item.GroupID == group.ID {
+				items[item.Source] = item
+			}
+		}
+		return items
+	}
+	items := metrics(2, time.Time{})
+	require.Len(t, items, 2, "billing and upstream measurements must remain separate")
+	require.EqualValues(t, 1, items["upstream"].Samples, "the per-group limit applies before aggregation")
+	require.InDelta(t, .9, *items["upstream"].CacheHitRate, .00001)
+	require.InDelta(t, .5, *items["billing"].CacheHitRate, .00001)
+	items = metrics(100, now.Add(-90*time.Second))
+	require.Len(t, items, 1)
+	require.Contains(t, items, "billing")
+	require.Empty(t, metrics(100, now.Add(-30*time.Second)))
+	saved, err := repo.List(ctx, group.ID)
+	require.NoError(t, err)
+	require.Len(t, saved, 4, "reads enforce limits without requiring a cleanup worker or deleting data")
 }

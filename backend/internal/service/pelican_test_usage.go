@@ -19,17 +19,21 @@ type pelicanTestUsageCollector struct {
 }
 
 type pelicanTestUsage struct {
-	protocol    string
-	model       string
-	serviceTier string
-	tokens      UsageTokens
-	input       int
-	output      int
-	thoughts    int
-	seen        bool
-	inputSeen   bool
-	outputSeen  bool
-	complete    bool
+	protocol       string
+	model          string
+	serviceTier    string
+	finishReason   string
+	tokens         UsageTokens
+	input          int
+	output         int
+	thoughts       int
+	seen           bool
+	inputSeen      bool
+	cacheReadSeen  bool
+	cacheWriteSeen bool
+	outputSeen     bool
+	complete       bool
+	invalid        bool
 }
 
 func startPelicanTestStream(c *gin.Context, protocol string) *pelicanTestUsage {
@@ -73,6 +77,9 @@ func (u *pelicanTestUsage) read(raw string) {
 	}
 	data := gjson.Parse(raw)
 	eventType := data.Get("type").String()
+	if reason := data.Get("delta.stop_reason").String(); reason != "" {
+		u.finishReason = reason
+	}
 	if eventType == "message_stop" || eventType == "response.completed" || eventType == "response.done" || eventType == "response.failed" || eventType == "response.incomplete" {
 		u.complete = true
 	}
@@ -97,7 +104,8 @@ func (u *pelicanTestUsage) read(raw string) {
 		}
 	}
 	for _, choice := range data.Get("choices").Array() {
-		if choice.Get("finish_reason").String() != "" {
+		if reason := choice.Get("finish_reason").String(); reason != "" {
+			u.finishReason = reason
 			u.complete = true
 		}
 	}
@@ -105,15 +113,27 @@ func (u *pelicanTestUsage) read(raw string) {
 		return
 	}
 	set := func(field string, value *int) {
-		if n := usage.Get(field); n.Type == gjson.Number && n.Float() >= 0 {
-			*value = int(n.Int())
-			u.seen = true
-			if value == &u.input {
-				u.inputSeen = true
-			}
-			if value == &u.output {
-				u.outputSeen = true
-			}
+		n := usage.Get(field)
+		if !n.Exists() {
+			return
+		}
+		if n.Type != gjson.Number || n.Float() < 0 || n.Float() > 1_000_000_000 || math.IsNaN(n.Float()) || math.IsInf(n.Float(), 0) || n.Float() != math.Trunc(n.Float()) {
+			u.invalid = true
+			return
+		}
+		*value = int(n.Int())
+		u.seen = true
+		if value == &u.input {
+			u.inputSeen = true
+		}
+		if value == &u.tokens.CacheReadTokens {
+			u.cacheReadSeen = true
+		}
+		if value == &u.tokens.CacheCreationTokens {
+			u.cacheWriteSeen = true
+		}
+		if value == &u.output {
+			u.outputSeen = true
 		}
 	}
 	switch u.protocol {
@@ -144,6 +164,9 @@ func (u *pelicanTestUsage) read(raw string) {
 	u.tokens.InputTokens = u.input
 	if u.protocol != "anthropic" {
 		// OpenAI/Chat/Gemini input totals already include cache hits.
+		if u.inputSeen && u.tokens.CacheReadTokens+u.tokens.CacheCreationTokens > u.input {
+			u.invalid = true
+		}
 		u.tokens.InputTokens = max(0, u.input-u.tokens.CacheReadTokens-u.tokens.CacheCreationTokens)
 	}
 	u.tokens.OutputTokens = u.output + u.thoughts
@@ -156,7 +179,7 @@ func (c *pelicanTestUsageCollector) cost(billing *BillingService, account *Accou
 	var total float64
 	priced, incomplete := false, len(c.requests) == 0
 	for _, u := range c.requests {
-		if !u.seen || billing == nil {
+		if !u.seen || u.invalid || billing == nil {
 			incomplete = true
 			continue
 		}

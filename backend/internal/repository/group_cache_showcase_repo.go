@@ -34,14 +34,14 @@ func (r *groupCacheShowcaseRepository) Publish(ctx context.Context, item *servic
 	if err = tx.QueryRowContext(ctx, `SELECT id FROM groups WHERE id=$1 AND deleted_at IS NULL AND status=$2 FOR UPDATE`, item.GroupID, service.StatusActive).Scan(&id); err != nil {
 		return err
 	}
-	err = tx.QueryRowContext(ctx, `INSERT INTO group_cache_showcase_runs (run_id,created_by,group_id,model,protocol,tested_at)
- VALUES ($1,$2,$3,$4,$5,$6) RETURNING id,published_at`, item.RunID, item.CreatedBy, item.GroupID, item.Model, item.Protocol, item.TestedAt).Scan(&item.ID, &item.PublishedAt)
+	err = tx.QueryRowContext(ctx, `INSERT INTO group_cache_showcase_runs (run_id,created_by,group_id,model,protocol,tested_at,plan_id,source)
+ VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id,published_at`, item.RunID, item.CreatedBy, item.GroupID, item.Model, item.Protocol, item.TestedAt, cachePlanID(item.PlanID), cacheSource(item.Source)).Scan(&item.ID, &item.PublishedAt)
 	if err != nil {
 		return cachePublicationError(err)
 	}
 	for _, round := range item.Rounds {
 		_, err = tx.ExecContext(ctx, `INSERT INTO group_cache_showcase_rounds (run_id,round_index,usage_log_id,input_tokens,cache_read_tokens,first_token_ms,measured_at)
- VALUES ($1,$2,$3,$4,$5,$6,$7)`, item.ID, round.Index, round.UsageLogID, round.InputTokens, round.CacheReadTokens, round.FirstTokenMs, round.MeasuredAt)
+ VALUES ($1,$2,$3,$4,$5,$6,$7)`, item.ID, round.Index, cachePlanID(round.UsageLogID), round.InputTokens, round.CacheReadTokens, round.FirstTokenMs, round.MeasuredAt)
 		if err != nil {
 			return cachePublicationError(err)
 		}
@@ -55,7 +55,7 @@ func (r *groupCacheShowcaseRepository) Publish(ctx context.Context, item *servic
 	return tx.Commit()
 }
 func (r *groupCacheShowcaseRepository) List(ctx context.Context, groupID int64) ([]*service.GroupCacheSnapshot, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT r.id,r.run_id,r.created_by,r.group_id,g.name,r.model,r.protocol,r.tested_at,r.published_at
+	rows, err := r.db.QueryContext(ctx, `SELECT r.id,r.run_id,r.created_by,r.group_id,g.name,r.model,r.protocol,r.tested_at,r.published_at,r.source
  FROM group_cache_showcase_runs r JOIN groups g ON g.id=r.group_id
  WHERE r.group_id=$1 ORDER BY r.tested_at DESC,r.id DESC LIMIT 100`, groupID)
 	if err != nil {
@@ -65,7 +65,7 @@ func (r *groupCacheShowcaseRepository) List(ctx context.Context, groupID int64) 
 	items := []*service.GroupCacheSnapshot{}
 	for rows.Next() {
 		item := &service.GroupCacheSnapshot{}
-		if err := rows.Scan(&item.ID, &item.RunID, &item.CreatedBy, &item.GroupID, &item.GroupName, &item.Model, &item.Protocol, &item.TestedAt, &item.PublishedAt); err != nil {
+		if err := rows.Scan(&item.ID, &item.RunID, &item.CreatedBy, &item.GroupID, &item.GroupName, &item.Model, &item.Protocol, &item.TestedAt, &item.PublishedAt, &item.Source); err != nil {
 			return nil, err
 		}
 		items = append(items, item)
@@ -80,16 +80,20 @@ func (r *groupCacheShowcaseRepository) Delete(ctx context.Context, id int64) (bo
 	count, err := result.RowsAffected()
 	return count > 0, err
 }
-func (r *groupCacheShowcaseRepository) Summary(ctx context.Context, since, now time.Time) ([]*service.GroupCacheShowcaseItem, error) {
+func (r *groupCacheShowcaseRepository) Summary(ctx context.Context, since, now time.Time, keep int, before time.Time) ([]*service.GroupCacheShowcaseItem, error) {
 	// Filter individual measurement times, not publication/run times. A run may
 	// straddle the rolling window. First rounds never contribute to warm metrics.
-	rows, err := r.db.QueryContext(ctx, `SELECT g.id,g.name,g.platform,r.model,r.protocol,MAX(r.tested_at),
+	// Enforce saved limits on reads even if no background worker has pruned yet.
+	rows, err := r.db.QueryContext(ctx, `WITH retained AS (
+ SELECT *,ROW_NUMBER() OVER(PARTITION BY group_id ORDER BY tested_at DESC,id DESC) rn
+ FROM group_cache_showcase_runs WHERE ($5::timestamptz IS NULL OR tested_at >= $5)
+ ) SELECT g.id,g.name,g.platform,r.model,r.protocol,r.source,MAX(r.tested_at),
  COUNT(p.run_id),COUNT(p.first_token_ms),COALESCE(SUM(p.input_tokens),0),COALESCE(SUM(p.cache_read_tokens),0),AVG(p.first_token_ms)
- FROM group_cache_showcase_runs r JOIN groups g ON g.id=r.group_id
+ FROM retained r JOIN groups g ON g.id=r.group_id
  LEFT JOIN group_cache_showcase_rounds p ON p.run_id=r.id AND p.round_index>1 AND p.measured_at >= $1 AND p.measured_at <= $2
- WHERE g.deleted_at IS NULL AND g.status=$3
- GROUP BY g.id,g.name,g.platform,g.sort_order,r.model,r.protocol
- ORDER BY g.sort_order,g.id,r.model,r.protocol`, since, now, service.StatusActive)
+ WHERE g.deleted_at IS NULL AND g.status=$3 AND r.rn<=$4
+ GROUP BY g.id,g.name,g.platform,g.sort_order,r.model,r.protocol,r.source
+ ORDER BY g.sort_order,g.id,r.model,r.protocol,r.source`, since, now, service.StatusActive, keep, cacheBefore(before))
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +101,7 @@ func (r *groupCacheShowcaseRepository) Summary(ctx context.Context, since, now t
 	items := []*service.GroupCacheShowcaseItem{}
 	for rows.Next() {
 		item := &service.GroupCacheShowcaseItem{}
-		if err := rows.Scan(&item.GroupID, &item.GroupName, &item.Platform, &item.Model, &item.Protocol, &item.LastTestedAt, &item.Samples, &item.LatencySamples, &item.InputTokens, &item.CacheReadTokens, &item.FirstTokenMs); err != nil {
+		if err := rows.Scan(&item.GroupID, &item.GroupName, &item.Platform, &item.Model, &item.Protocol, &item.Source, &item.LastTestedAt, &item.Samples, &item.LatencySamples, &item.InputTokens, &item.CacheReadTokens, &item.FirstTokenMs); err != nil {
 			return nil, err
 		}
 		if item.InputTokens > 0 {
@@ -107,4 +111,27 @@ func (r *groupCacheShowcaseRepository) Summary(ctx context.Context, since, now t
 		items = append(items, item)
 	}
 	return items, rows.Err()
+}
+
+func cachePlanID(id int64) any {
+	if id <= 0 {
+		return nil
+	}
+	return id
+}
+func cacheSource(source string) string {
+	if source == "upstream" {
+		return source
+	}
+	return "billing"
+}
+func (r *groupCacheShowcaseRepository) Prune(ctx context.Context, keep int, before time.Time) error {
+	_, err := r.db.ExecContext(ctx, `DELETE FROM group_cache_showcase_runs WHERE ($1::timestamptz IS NOT NULL AND tested_at<$1) OR id IN(SELECT id FROM(SELECT id,ROW_NUMBER() OVER(PARTITION BY group_id ORDER BY tested_at DESC,id DESC)rn FROM group_cache_showcase_runs)x WHERE rn>$2)`, cacheBefore(before), keep)
+	return err
+}
+func cacheBefore(t time.Time) any {
+	if t.IsZero() {
+		return nil
+	}
+	return t
 }
