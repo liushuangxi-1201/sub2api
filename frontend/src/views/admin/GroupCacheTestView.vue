@@ -8,6 +8,7 @@
       </header>
       <p v-if="error" role="alert" class="rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950 dark:text-red-300">{{ error }}</p>
       <p v-if="storageError" role="status" class="text-sm text-amber-600">{{ t('admin.groupCacheTest.storageError') }}</p>
+      <GroupCachePublicationPanel :key="auth.user?.id" :run="selected" :group-id="groupId" :busy="busy" />
       <div class="grid items-start gap-6 xl:grid-cols-[340px_minmax(0,1fr)]">
         <section class="cache-panel" aria-labelledby="cache-config-title">
           <h2 id="cache-config-title" class="cache-heading">{{ t('admin.groupCacheTest.configuration') }}</h2>
@@ -91,6 +92,7 @@ import { useI18n } from 'vue-i18n'
 import { saveAs } from 'file-saver'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import SmartOpsNav from '@/components/admin/operations/SmartOpsNav.vue'
+import GroupCachePublicationPanel from '@/components/admin/operations/GroupCachePublicationPanel.vue'
 import { useAuthStore } from '@/stores/auth'
 import * as groupsAPI from '@/api/admin/groups'
 import * as keysAPI from '@/api/keys'

@@ -14,6 +14,7 @@ vi.mock('@/stores/auth', () => ({ useAuthStore: () => mocks.auth }))
 vi.mock('file-saver', () => ({ saveAs: mocks.saveAs }))
 vi.mock('@/components/layout/AppLayout.vue', () => ({ default: { template: '<main><slot /></main>' } }))
 vi.mock('@/components/admin/operations/SmartOpsNav.vue', () => ({ default: { template: '<nav />' } }))
+vi.mock('@/components/admin/operations/GroupCachePublicationPanel.vue', () => ({ default: { template: '<section />' } }))
 vi.mock('vue-i18n', async () => ({
   ...await vi.importActual<typeof import('vue-i18n')>('vue-i18n'),
   useI18n: () => ({ t: (key: string) => key })

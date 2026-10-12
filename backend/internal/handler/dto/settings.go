@@ -484,8 +484,9 @@ type PublicSettings struct {
 	ChannelMonitorShowQuota              bool   `json:"channel_monitor_show_quota"`
 	ChannelMonitorHideUserRanking        bool   `json:"channel_monitor_hide_user_ranking"`
 
-	AvailableChannelsEnabled bool `json:"available_channels_enabled"`
-	PelicanShowcaseEnabled   bool `json:"pelican_showcase_enabled"`
+	AvailableChannelsEnabled  bool `json:"available_channels_enabled"`
+	PelicanShowcaseEnabled    bool `json:"pelican_showcase_enabled"`
+	GroupCacheShowcaseEnabled bool `json:"group_cache_showcase_enabled"`
 
 	SubscriptionEnabled bool `json:"subscription_enabled"`
 

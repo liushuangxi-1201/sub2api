@@ -455,7 +455,8 @@ type PublicSettings struct {
 	AvailableChannelsEnabled bool `json:"available_channels_enabled"`
 
 	// Pelican showcase feature (user-facing gallery; limits stay admin-only)
-	PelicanShowcaseEnabled bool `json:"pelican_showcase_enabled"`
+	PelicanShowcaseEnabled    bool `json:"pelican_showcase_enabled"`
+	GroupCacheShowcaseEnabled bool `json:"group_cache_showcase_enabled"`
 
 	// Subscription feature switch (see SystemSettings.SubscriptionEnabled)
 	SubscriptionEnabled bool `json:"subscription_enabled"`
