@@ -19,6 +19,8 @@ import { nextTick } from 'vue'
 
 import en from '@/i18n/locales/en/admin/resources'
 import zh from '@/i18n/locales/zh/admin/resources'
+import enDashboard from '@/i18n/locales/en/dashboard'
+import zhDashboard from '@/i18n/locales/zh/dashboard'
 import UsageTable from '../UsageTable.vue'
 
 let locale: 'en' | 'zh' = 'en'
@@ -26,10 +28,14 @@ const localizedMessages: Record<'en' | 'zh', Record<string, string>> = {
   en: {
     'admin.usage.longContext': en.usage.longContext,
     'admin.usage.longContextPricingTooltip': en.usage.longContextPricingTooltip,
+    'usage.cacheRate': enDashboard.usage.cacheRate,
+    'usage.cacheRateHint': enDashboard.usage.cacheRateHint,
   },
   zh: {
     'admin.usage.longContext': zh.usage.longContext,
     'admin.usage.longContextPricingTooltip': zh.usage.longContextPricingTooltip,
+    'usage.cacheRate': zhDashboard.usage.cacheRate,
+    'usage.cacheRateHint': zhDashboard.usage.cacheRateHint,
   },
 }
 
@@ -174,6 +180,58 @@ describe('admin UsageTable tooltip', () => {
       height: 20,
       toJSON: () => ({}),
     } as DOMRect)
+  })
+
+  it.each([
+    ['en', true, enDashboard.usage.cacheRate, enDashboard.usage.cacheRateHint],
+    ['zh', true, zhDashboard.usage.cacheRate, zhDashboard.usage.cacheRateHint],
+    ['en', false, enDashboard.usage.cacheRate, enDashboard.usage.cacheRateHint],
+    ['zh', false, zhDashboard.usage.cacheRate, zhDashboard.usage.cacheRateHint],
+  ] as const)('shows cache rates under costs in %s with account billing %s', (language, showAccountBilling, label, hint) => {
+    locale = language
+    const row = {
+      ...baseImageRow,
+      request_id: 'req-cached',
+      actual_cost: 0.010043,
+      billing_mode: 'token',
+      image_count: 0,
+      input_tokens: 123,
+      output_tokens: 5_000,
+      cache_read_tokens: 877,
+    }
+    const wrapper = mount(UsageTable, {
+      props: {
+        data: [
+          row,
+          { ...row, request_id: 'req-uncached', cache_read_tokens: 0 },
+          { ...row, request_id: 'req-all-cached', input_tokens: 0 },
+          { ...row, request_id: 'req-no-input', input_tokens: 0, cache_read_tokens: 0 },
+          { ...row, request_id: 'req-invalid', cache_read_tokens: -1 },
+          { ...baseImageRow, request_id: 'req-image' },
+          { ...row, request_id: 'req-video', billing_mode: 'video' },
+        ],
+        loading: false,
+        columns: [{ key: 'cost', label: 'Cost' }],
+        showAccountBilling,
+      },
+      global: { stubs: { DataTable: DataTableStub, EmptyState: true, Icon: true, Teleport: true } },
+    })
+
+    expect(wrapper.findAll('[data-testid="usage-cache-rate"]').map(cell => cell.text())).toEqual([
+      '87.7%', '0.0%', '100.0%', '—', '—', '—', '—',
+    ])
+    const cachedCell = wrapper.get('[data-request-id="req-cached"]')
+    expect(cachedCell.text()).toContain('$0.010043')
+    const meter = cachedCell.get('[role="meter"]')
+    expect(meter.attributes('aria-label')).toBe(label)
+    expect(meter.attributes('aria-valuenow')).toBe('87.7')
+    expect(meter.attributes('aria-valuetext')).toBe('87.7%')
+    expect(meter.element.parentElement?.getAttribute('title')).toBe(hint)
+    expect((meter.element.firstElementChild as HTMLElement).style.width).toBe('87.7%')
+    const meters = wrapper.findAll('[role="meter"]')
+    expect(meters).toHaveLength(3)
+    expect(meters.map(cell => cell.attributes('aria-valuenow'))).toEqual(['87.7', '0', '100'])
+    expect(cachedCell.text().includes('A $')).toBe(showAccountBilling)
   })
 
   it.each([

@@ -457,6 +457,8 @@ export default {
     cacheHit: '缓存命中',
     cacheCreate: '缓存创建',
     cacheHitRate: '缓存命中率',
+    cacheRate: '缓存率',
+    cacheRateHint: '按使用记录计算：缓存读取 Token ÷（输入 Token + 缓存写入 Token + 缓存读取 Token）。不含输出 Token，5 分钟/1 小时缓存写入明细不重复计入；图片/视频计费及无有效输入记录显示 —。可能受缓存计费规则影响。',
     inputTokenPrice: '输入单价',
     outputTokenPrice: '输出单价',
     perMillionTokens: '/ 1M Token',

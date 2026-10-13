@@ -452,6 +452,8 @@ export default {
     cacheHit: 'Cache hit',
     cacheCreate: 'Cache create',
     cacheHitRate: 'Cache hit rate',
+    cacheRate: 'Cache rate',
+    cacheRateHint: 'Based on recorded input, cache creation, and cache read tokens. Excludes output; the 5m/1h cache-creation breakdown is not counted twice. Image/video billing and records without valid input show —. Billing rules may affect this value.',
     inputTokenPrice: 'Input price',
     outputTokenPrice: 'Output price',
     perMillionTokens: '/ 1M tokens',

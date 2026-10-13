@@ -207,7 +207,7 @@
         </template>
 
         <template #cell-cost="{ row }">
-          <div class="text-sm">
+          <div class="min-w-[124px] text-sm">
             <div class="flex items-center gap-1.5">
               <span class="font-medium text-green-600 dark:text-green-400">${{ row.actual_cost?.toFixed(6) || '0.000000' }}</span>
               <span
@@ -229,6 +229,26 @@
             </div>
             <div v-if="showAccountBilling && row.account_rate_multiplier != null" class="mt-0.5 text-[11px] text-orange-500 dark:text-orange-400">
               A ${{ accountBilled(row).toFixed(6) }}
+            </div>
+            <div class="mt-1.5 space-y-1" :title="t('usage.cacheRateHint')">
+              <div class="flex items-center justify-between gap-3 text-xs">
+                <span class="text-gray-500 dark:text-gray-400">{{ t('usage.cacheRate') }}</span>
+                <span data-testid="usage-cache-rate" class="font-medium tabular-nums text-teal-600 dark:text-teal-300">
+                  {{ formatUsageCacheRate(row) ?? '—' }}
+                </span>
+              </div>
+              <div
+                v-if="usageCacheRate(row) != null"
+                role="meter"
+                :aria-label="t('usage.cacheRate')"
+                :aria-valuenow="usageCacheRate(row) ?? undefined"
+                :aria-valuetext="formatUsageCacheRate(row) ?? undefined"
+                :aria-valuemin="0"
+                :aria-valuemax="100"
+                class="h-1 overflow-hidden rounded-full bg-teal-100 dark:bg-teal-900/40"
+              >
+                <div class="h-full rounded-full bg-teal-500 dark:bg-teal-400" :style="{ width: `${usageCacheRate(row)}%` }"></div>
+              </div>
             </div>
           </div>
         </template>
@@ -563,6 +583,7 @@ import {
   tpsSeverity,
 } from '@/utils/latencyHealth'
 import { formatUsageOutputTps, usageOutputTps } from '@/utils/usageTps'
+import { formatUsageCacheRate, usageCacheRate } from '@/utils/usageCacheRate'
 import {
   BILLING_MODE_TOKEN,
   getBillingModeLabel,
